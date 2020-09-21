@@ -87,9 +87,11 @@ public abstract class AbstractJerseyEurekaHttpClient implements EurekaHttpClient
 
     @Override
     public EurekaHttpResponse<InstanceInfo> sendHeartBeat(String appName, String id, InstanceInfo info, InstanceStatus overriddenStatus) {
+        // 请求路径
         String urlPath = "apps/" + appName + '/' + id;
         ClientResponse response = null;
         try {
+            // serviceUrl 服务中心地址
             WebResource webResource = jerseyClient.resource(serviceUrl)
                     .path(urlPath)
                     .queryParam("status", info.getStatus().toString())
