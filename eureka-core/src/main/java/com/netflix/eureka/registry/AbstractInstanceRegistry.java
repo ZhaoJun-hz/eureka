@@ -188,9 +188,19 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
      *
      * @see com.netflix.eureka.lease.LeaseManager#register(java.lang.Object, int, boolean)
      */
+    /**
+     * 提供实例注册功能
+     * @param registrant
+     * @param leaseDuration
+     * @param isReplication
+     */
     public void register(InstanceInfo registrant, int leaseDuration, boolean isReplication) {
         try {
             read.lock();
+            // register，就是注册表ConcurrentHashMap<String, Map<String, Lease<InstanceInfo>>>
+            // key是服务名字，value是Map<String, Lease<InstanceInfo>>，key是id，value是实例信息
+
+            // 判断有没有服务，没有创建
             Map<String, Lease<InstanceInfo>> gMap = registry.get(registrant.getAppName());
             REGISTER.increment(isReplication);
             if (gMap == null) {
@@ -200,6 +210,8 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
                     gMap = gNewMap;
                 }
             }
+
+            // 判断服务中有没有该实例，没有就创建
             Lease<InstanceInfo> existingLease = gMap.get(registrant.getId());
             // Retain the last dirty timestamp without overwriting it, if there is already a lease
             if (existingLease != null && (existingLease.getHolder() != null)) {
@@ -375,6 +387,7 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
                 }
             }
             renewsLastMin.increment();
+            // 时间戳更新，更新最后更新时间
             leaseToRenew.renew();
             return true;
         }
@@ -1213,6 +1226,9 @@ public abstract class AbstractInstanceRegistry implements InstanceRegistry {
         }
     }
 
+    /**
+     * 失效剔除定时任务
+     */
     protected void postInit() {
         renewsLastMin.start();
         if (evictionTaskRef.get() != null) {

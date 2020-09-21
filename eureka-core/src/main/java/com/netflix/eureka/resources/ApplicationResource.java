@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
  * @author Karthik Ranganathan, Greg Kim
  *
  */
+// Produces，标注返回类型
 @Produces({"application/xml", "application/json"})
 public class ApplicationResource {
     private static final Logger logger = LoggerFactory.getLogger(ApplicationResource.class);
@@ -139,12 +140,19 @@ public class ApplicationResource {
      *            a header parameter containing information whether this is
      *            replicated from other nodes.
      */
+    /**
+     * 供客户端进行服务注册接口
+     * @param info
+     * @param isReplication
+     * @return
+     */
     @POST
     @Consumes({"application/json", "application/xml"})
     public Response addInstance(InstanceInfo info,
                                 @HeaderParam(PeerEurekaNode.HEADER_REPLICATION) String isReplication) {
         logger.debug("Registering instance {} (replication={})", info.getId(), isReplication);
         // validate that the instanceinfo contains all the necessary required fields
+        // 注册信息验证，必备的信息
         if (isBlank(info.getId())) {
             return Response.status(400).entity("Missing instanceId").build();
         } else if (isBlank(info.getHostName())) {
@@ -182,7 +190,9 @@ public class ApplicationResource {
             }
         }
 
+        // 完成注册
         registry.register(info, "true".equals(isReplication));
+        // 注册成功，返回编码204
         return Response.status(204).build();  // 204 to be backwards compatible
     }
 

@@ -73,6 +73,9 @@ public class PeerEurekaNodes {
         return serverConfig.getHealthStatusMinNumberOfAvailablePeers();
     }
 
+    /**
+     * 构建一个线程池
+     */
     public void start() {
         taskExecutor = Executors.newSingleThreadScheduledExecutor(
                 new ThreadFactory() {
@@ -90,6 +93,7 @@ public class PeerEurekaNodes {
                 @Override
                 public void run() {
                     try {
+                        // 更新对等节点信息，因为Eureka Server集群节点可能发生变化
                         updatePeerEurekaNodes(resolvePeerUrls());
                     } catch (Throwable e) {
                         logger.error("Cannot update the replica Nodes", e);

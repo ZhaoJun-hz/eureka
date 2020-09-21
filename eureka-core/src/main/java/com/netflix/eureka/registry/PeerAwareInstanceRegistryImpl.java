@@ -205,8 +205,10 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
     @Override
     public int syncUp() {
         // Copy entire entry from neighboring DS node
+        // 计数
         int count = 0;
 
+        // 因为可能一次没连上远程server，做重试
         for (int i = 0; ((i < serverConfig.getRegistrySyncRetries()) && (count == 0)); i++) {
             if (i > 0) {
                 try {
@@ -216,12 +218,16 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
                     break;
                 }
             }
+            // 获取到其他server的注册表信息
             Applications apps = eurekaClient.getApplications();
             for (Application app : apps.getRegisteredApplications()) {
                 for (InstanceInfo instance : app.getInstances()) {
                     try {
                         if (isRegisterable(instance)) {
+                            // 把从远程获取过来的注册信息注册到自己的注册表中(map)
+                            // 最后一个参数，是否是复制的
                             register(instance, instance.getLeaseInfo().getDurationInSecs(), true);
+                            // 计数加1
                             count++;
                         }
                     } catch (Throwable t) {
@@ -251,7 +257,9 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
             primeAwsReplicas(applicationInfoManager);
         }
         logger.info("Changing status to UP");
+        // 实例状态改为UP
         applicationInfoManager.setInstanceStatus(InstanceStatus.UP);
+        // 开启定时任务，每隔60s时间，进行一次服务失效剔除
         super.postInit();
     }
 
@@ -399,13 +407,17 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
      *            true if this is a replication event from other replica nodes,
      *            false otherwise.
      */
+
     @Override
     public void register(final InstanceInfo info, final boolean isReplication) {
+        // 服务时效间隔，如果客户端自己配置，取客户端配置
         int leaseDuration = Lease.DEFAULT_DURATION_IN_SECS;
         if (info.getLeaseInfo() != null && info.getLeaseInfo().getDurationInSecs() > 0) {
             leaseDuration = info.getLeaseInfo().getDurationInSecs();
         }
+        // 调用父类register注册实例
         super.register(info, leaseDuration, isReplication);
+        // 当前server把该注册实例信息同步到其他的server节点
         replicateToPeers(Action.Register, info.getAppName(), info.getId(), info, null, isReplication);
     }
 
@@ -416,7 +428,9 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
      * java.lang.String, long, boolean)
      */
     public boolean renew(final String appName, final String id, final boolean isReplication) {
+        // 本地renew操作
         if (super.renew(appName, id, isReplication)) {
+            // renew操作同步到其他peer节点
             replicateToPeers(Action.Heartbeat, appName, id, null, null, isReplication);
             return true;
         }
@@ -626,11 +640,14 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
                 return;
             }
 
+            // 从PeerEurekaNodes中获取对等节点信息，然后一个一个同步
             for (final PeerEurekaNode node : peerEurekaNodes.getPeerEurekaNodes()) {
                 // If the url represents this host, do not replicate to yourself.
+                // 判断循环到的节点是否是自己，如果是自己，不再同步
                 if (peerEurekaNodes.isThisMyUrl(node.getServiceUrl())) {
                     continue;
                 }
+                // 同步
                 replicateInstanceActionsToPeers(action, appName, id, info, newStatus, node);
             }
         } finally {
@@ -646,18 +663,22 @@ public class PeerAwareInstanceRegistryImpl extends AbstractInstanceRegistry impl
     private void replicateInstanceActionsToPeers(Action action, String appName,
                                                  String id, InstanceInfo info, InstanceStatus newStatus,
                                                  PeerEurekaNode node) {
+        // 对等节点实例动作同步
         try {
             InstanceInfo infoFromRegistry = null;
             CurrentRequestVersion.set(Version.V2);
             switch (action) {
+                // 下架
                 case Cancel:
                     node.cancel(appName, id);
                     break;
+                // 心跳
                 case Heartbeat:
                     InstanceStatus overriddenStatus = overriddenInstanceStatusMap.get(id);
                     infoFromRegistry = getInstanceByAppAndId(appName, id, false);
                     node.heartbeat(appName, id, infoFromRegistry, overriddenStatus, false);
                     break;
+                // 注册
                 case Register:
                     node.register(info);
                     break;
